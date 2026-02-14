@@ -849,12 +849,103 @@ class Tabuleiro:
                 texto_num = fonte_media.render(str(i), True, cor_texto)
                 TELA.blit(texto_num, (x - texto_num.get_width() // 2, y - texto_num.get_height() // 2))
 
+class TecladoMobile:
+    def __init__(self):
+        self.teclas = [
+            ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+            ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+            ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '⌫'],
+        ]
+        self.tamanho_tecla = 35
+        self.espacamento = 5
+
+    def desenhar(self, x_inicio, y_inicio, input_ativo):
+        if not input_ativo:
+            return None
+        
+        rects_teclas = []
+        y = y_inicio
+        
+        for linha_idx, linha in enumerate(self.teclas):
+            x = x_inicio
+            for tecla in linha:
+                rect = pygame.Rect(x, y, self.tamanho_tecla, self.tamanho_tecla)
+                rects_teclas.append((rect, tecla))
+                
+                cor = OURO if tecla == '⌫' else DOURADO
+                pygame.draw.rect(TELA, cor, rect, border_radius=5)
+                pygame.draw.rect(TELA, BRANCO, rect, 2, border_radius=5)
+                
+                texto = fonte_mini.render(tecla, True, PRETO)
+                TELA.blit(texto, (rect.centerx - texto.get_width() // 2, rect.centery - texto.get_height() // 2))
+                
+                x += self.tamanho_tecla + self.espacamento
+            
+            y += self.tamanho_tecla + self.espacamento
+        
+        return rects_teclas
+
+class PopupSair:
+    def __init__(self):
+        self.ativo = False
+        self.confirmacao_rect = None
+        self.cancelamento_rect = None
+        self.animacao_frame = 0
+
+    def mostrar(self):
+        self.ativo = True
+        self.animacao_frame = 0
+
+    def fechar(self):
+        self.ativo = False
+
+    def desenhar(self, tela):
+        if not self.ativo:
+            return
+        
+        self.animacao_frame += 1
+        alpha = min(255, self.animacao_frame * 10)
+        
+        overlay = pygame.Surface((LARGURA, ALTURA))
+        overlay.fill((0, 0, 0))
+        overlay.set_alpha(alpha)
+        tela.blit(overlay, (0, 0))
+        
+        largura_popup = 600
+        altura_popup = 350
+        x_popup = LARGURA // 2 - largura_popup // 2
+        y_popup = ALTURA // 2 - altura_popup // 2
+        
+        popup_rect = pygame.Rect(x_popup, y_popup, largura_popup, altura_popup)
+        pygame.draw.rect(tela, CINZA_ESCURO, popup_rect, border_radius=20)
+        pygame.draw.rect(tela, OURO, popup_rect, 5, border_radius=20)
+        
+        titulo = fonte_grande.render("SAIR DO JOGO?", True, VERMELHO)
+        tela.blit(titulo, (LARGURA // 2 - titulo.get_width() // 2, y_popup + 40))
+        
+        mensagem = fonte_media.render("Tem certeza que deseja sair?", True, BRANCO)
+        tela.blit(mensagem, (LARGURA // 2 - mensagem.get_width() // 2, y_popup + 120))
+        
+        self.confirmacao_rect = pygame.Rect(x_popup + 50, y_popup + 220, 200, 80)
+        pygame.draw.rect(tela, VERMELHO, self.confirmacao_rect, border_radius=10)
+        pygame.draw.rect(tela, BRANCO, self.confirmacao_rect, 3, border_radius=10)
+        txt_sim = fonte_media.render("SIM", True, BRANCO)
+        tela.blit(txt_sim, (self.confirmacao_rect.centerx - txt_sim.get_width() // 2, self.confirmacao_rect.centery - txt_sim.get_height() // 2))
+        
+        self.cancelamento_rect = pygame.Rect(x_popup + 350, y_popup + 220, 200, 80)
+        pygame.draw.rect(tela, VERDE, self.cancelamento_rect, border_radius=10)
+        pygame.draw.rect(tela, BRANCO, self.cancelamento_rect, 3, border_radius=10)
+        txt_nao = fonte_media.render("NÃO", True, BRANCO)
+        tela.blit(txt_nao, (self.cancelamento_rect.centerx - txt_nao.get_width() // 2, self.cancelamento_rect.centery - txt_nao.get_height() // 2))
+
 class Jogo:
     def __init__(self):
         self.clock = pygame.time.Clock()
         self.sistema_ranking = SistemaRanking()
         self.tabuleiro = Tabuleiro()
         self.painel = Painel()
+        self.teclado_mobile = TecladoMobile()
+        self.popup_sair = PopupSair()
         self.estado = "fade_in"
         self.transicao_ativa = False
         self.transicao_opacidade = 255
@@ -1086,6 +1177,13 @@ class Jogo:
             texto_rank,
             (botao_ranking.centerx - texto_rank.get_width() // 2, botao_ranking.centery - texto_rank.get_height() // 2)
         )
+        botao_sair = pygame.Rect(LARGURA // 2 - 120, min(ALTURA - 60, 760), 240, 50)
+        pygame.draw.rect(TELA, VERMELHO, botao_sair, border_radius=10)
+        texto_sair = fonte_media.render("Sair", True, BRANCO)
+        TELA.blit(
+            texto_sair,
+            (botao_sair.centerx - texto_sair.get_width() // 2, botao_sair.centery - texto_sair.get_height() // 2)
+        )
 
     def desenhar_selecao_personagem(self):
         self.desenhar_fundo_medieval()
@@ -1143,6 +1241,10 @@ class Jogo:
         if self.input_ativo[idx] and pygame.time.get_ticks() % 1000 < 500:
             cursor_x = input_rect.x + 10 + (fonte_media.size(self.nomes_personagens[idx])[0] if self.nomes_personagens[idx] else 0)
             pygame.draw.line(TELA, PRETO, (cursor_x, input_rect.y + 10), (cursor_x, input_rect.y + 40), 2)
+        
+        # Desenhar teclado mobile se input estiver ativo
+        if self.input_ativo[idx]:
+            rects_teclas = self.teclado_mobile.desenhar(x + 20, y_input + 70, True)
 
     def desenhar_tabuleiro(self):
         self.desenhar_fundo_medieval()
@@ -1299,10 +1401,18 @@ class Jogo:
     def processar_eventos(self):
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                self.popup_sair.mostrar()
             if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
                 x, y = evento.pos
+                # Processar cliques no popup de sair
+                if self.popup_sair.ativo:
+                    if self.popup_sair.confirmacao_rect and self.popup_sair.confirmacao_rect.collidepoint(evento.pos):
+                        pygame.quit()
+                        sys.exit()
+                    elif self.popup_sair.cancelamento_rect and self.popup_sair.cancelamento_rect.collidepoint(evento.pos):
+                        self.popup_sair.fechar()
+                    continue
+                
                 if self.estado == "menu_inicial":
                     botao_rect = pygame.Rect(LARGURA // 2 - 120, min(ALTURA - 180, 620), 240, 50)
                     if botao_rect.collidepoint(evento.pos):
@@ -1314,6 +1424,9 @@ class Jogo:
                     botao_ranking = pygame.Rect(LARGURA // 2 - 120, min(ALTURA - 120, 690), 240, 50)
                     if botao_ranking.collidepoint(evento.pos):
                         self.iniciar_transicao("ranking")
+                    botao_sair = pygame.Rect(LARGURA // 2 - 120, min(ALTURA - 60, 760), 240, 50)
+                    if botao_sair.collidepoint(evento.pos):
+                        self.popup_sair.mostrar()
                 elif self.estado == "selecao_personagem":
                     largura_painel = min(400, (LARGURA - 200) // 2)
                     altura_painel = min(600, ALTURA - 250)
@@ -1324,8 +1437,39 @@ class Jogo:
                     largura_input = largura_painel - 40
                     y_input = y_painel + altura_painel - 180
                     input_rect_1 = pygame.Rect(x_esquerda + 20, y_input, largura_input, 50)
-                    self.input_ativo[0] = input_rect_1.collidepoint(evento.pos)
                     input_rect_2 = pygame.Rect(x_direita + 20, y_input, largura_input, 50)
+                    
+                    # Verificar cliques no teclado mobile
+                    rects_teclas_1 = None
+                    rects_teclas_2 = None
+                    if self.input_ativo[0]:
+                        rects_teclas_1 = self.teclado_mobile.desenhar(x_esquerda + 20, y_input + 70, True)
+                    if self.input_ativo[1]:
+                        rects_teclas_2 = self.teclado_mobile.desenhar(x_direita + 20, y_input + 70, True)
+                    
+                    # Processar cliques nas teclas
+                    if rects_teclas_1:
+                        for rect, tecla in rects_teclas_1:
+                            if rect.collidepoint(evento.pos):
+                                if tecla == '⌫':
+                                    self.nomes_personagens[0] = self.nomes_personagens[0][:-1]
+                                else:
+                                    if len(self.nomes_personagens[0]) < 15:
+                                        self.nomes_personagens[0] += tecla.lower()
+                                break
+                    
+                    if rects_teclas_2:
+                        for rect, tecla in rects_teclas_2:
+                            if rect.collidepoint(evento.pos):
+                                if tecla == '⌫':
+                                    self.nomes_personagens[1] = self.nomes_personagens[1][:-1]
+                                else:
+                                    if len(self.nomes_personagens[1]) < 15:
+                                        self.nomes_personagens[1] += tecla.lower()
+                                break
+                    
+                    # Cliques nos inputs
+                    self.input_ativo[0] = input_rect_1.collidepoint(evento.pos)
                     self.input_ativo[1] = input_rect_2.collidepoint(evento.pos)
                     if self.input_ativo[0] and self.input_ativo[1]:
                         if input_rect_1.collidepoint(evento.pos):
@@ -1428,6 +1572,7 @@ class Jogo:
                 atualizar_particulas()
                 desenhar_particulas()
             self.desenhar_transicao()
+            self.popup_sair.desenhar(TELA)
             pygame.display.flip()
             await asyncio.sleep(0)
 
